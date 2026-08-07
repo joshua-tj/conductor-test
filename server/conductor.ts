@@ -4,6 +4,8 @@ export interface ConductorConfig {
   apiUrl: string
   apiKey: string
   sessionId?: string
+  workspaceProjectId?: string
+  workspaceRepositoryUrl?: string
   retries: number
   retryBaseMs: number
   requestTimeoutMs: number
@@ -27,10 +29,13 @@ export class ConductorClient {
     this.baseUrl = base.endsWith('/v0') ? base : `${base}/v0`
   }
 
-  createWorkspace(repositoryUrl: string, name: string) {
+  createWorkspace(name: string) {
+    const workspaceSource = this.config.workspaceProjectId
+      ? { projectId: this.config.workspaceProjectId }
+      : { repositoryUrl: this.config.workspaceRepositoryUrl! }
     return this.request<{ workspaceId: string; sessionId: string; deepLink: string }>('/workspaces', {
       method: 'POST',
-      body: JSON.stringify({ repositoryUrl, name, sessionName: 'Security audit', agent: 'codex', model: 'gpt-5.6-sol' }),
+      body: JSON.stringify({ ...workspaceSource, name, sessionName: 'Security audit', agent: 'codex', model: 'gpt-5.6-sol' }),
     })
   }
 
@@ -104,11 +109,17 @@ export class ConductorClient {
 export function conductorConfigFromEnv(): ConductorConfig {
   const apiUrl = process.env.CONDUCTOR_API_URL
   const apiKey = process.env.CONDUCTOR_API_KEY ?? process.env.CONDUCTOR_API_TOKEN
-  if (!apiUrl || !apiKey) throw new Error('Conductor server configuration is missing')
+  const workspaceProjectId = process.env.CONDUCTOR_WORKSPACE_PROJECT_ID
+  const workspaceRepositoryUrl = process.env.CONDUCTOR_WORKSPACE_REPOSITORY_URL
+  if (!apiUrl || !apiKey || (!workspaceProjectId && !workspaceRepositoryUrl)) {
+    throw new Error('Conductor server configuration is missing')
+  }
   return {
     apiUrl,
     apiKey,
     sessionId: process.env.CONDUCTOR_SESSION_ID,
+    workspaceProjectId,
+    workspaceRepositoryUrl,
     retries: numberEnv('AUDIT_REQUEST_RETRIES', 3),
     retryBaseMs: numberEnv('AUDIT_RETRY_BASE_MS', 500),
     requestTimeoutMs: numberEnv('AUDIT_REQUEST_TIMEOUT_MS', 30_000),

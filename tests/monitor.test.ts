@@ -32,7 +32,14 @@ describe('Conductor monitor', () => {
       return json({ userMessage: 'Unexpected request' }, 500)
     })
 
-    const client = new ConductorClient({ apiUrl: 'https://api.example.test/v0', apiKey: 'test-key', retries: 0, retryBaseMs: 0, requestTimeoutMs: 1000 }, fetchMock as unknown as typeof fetch)
+    const client = new ConductorClient({
+      apiUrl: 'https://api.example.test/v0',
+      apiKey: 'test-key',
+      workspaceRepositoryUrl: 'https://github.com/acme/auditor-host',
+      retries: 0,
+      retryBaseMs: 0,
+      requestTimeoutMs: 1000,
+    }, fetchMock as unknown as typeof fetch)
     const monitor = new AuditMonitor(db, client, { pollIntervalMs: 0, maxPollErrors: 1, sleep: async () => {} })
     await monitor.processAudit(audit.id)
 
@@ -41,11 +48,14 @@ describe('Conductor monitor', () => {
     const [workspaceUrl, workspaceInit] = fetchMock.mock.calls[0]
     expect(workspaceUrl).toBe('https://api.example.test/v0/workspaces')
     expect(JSON.parse(String(workspaceInit?.body))).toMatchObject({
-      repositoryUrl: 'https://github.com/acme/tool',
+      repositoryUrl: 'https://github.com/acme/auditor-host',
       agent: 'codex',
       model: 'gpt-5.6-sol',
     })
     const headers = workspaceInit?.headers as Headers
     expect(headers.get('Authorization')).toBe('Bearer test-key')
+    const promptCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST' && String(init.body).includes('Static security and malware audit'))
+    expect(String(promptCall?.[1]?.body)).toContain('https://github.com/acme/tool')
+    expect(String(promptCall?.[1]?.body)).toContain('submodules disabled')
   })
 })

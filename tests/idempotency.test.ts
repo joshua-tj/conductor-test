@@ -31,4 +31,23 @@ describe('audit API idempotency', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ id: audit.id, status: 'completed', cached: true })
   })
+
+  it('requeues a failed audit so configuration errors can be retried', async () => {
+    const db = new AuditDatabase(':memory:')
+    databases.push(db)
+    const { audit } = db.createOrGet('https://github.com/acme/tool')
+    db.fail(audit.id, 'Previous attempt failed')
+    const kick = vi.fn()
+    const app = createApp(db, { kick })
+
+    const response = await app.request('/api/audits', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repositoryUrl: 'https://github.com/acme/tool' }),
+    })
+
+    expect(response.status).toBe(202)
+    expect(await response.json()).toMatchObject({ id: audit.id, status: 'queued', error: null, cached: false })
+    expect(kick).toHaveBeenCalledWith(audit.id)
+  })
 })

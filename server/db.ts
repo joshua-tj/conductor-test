@@ -72,9 +72,20 @@ export class AuditDatabase {
       INSERT OR IGNORE INTO audits (id, repository_url, status, created_at, updated_at)
       VALUES (?, ?, 'queued', ?, ?)
     `).run(id, repositoryUrl, now, now)
+    let shouldLaunch = result.changes === 1
+    if (!shouldLaunch) {
+      const retry = this.db.prepare(`
+        UPDATE audits SET status = 'queued', workspace_id = NULL, session_id = NULL, deep_link = NULL,
+          messages_json = '[]', transcript = '', error = NULL, conductor_state = NULL,
+          seen_working = 0, prompt_sent = 0, last_message_id = NULL, monitor_owner = NULL,
+          lease_until = NULL, updated_at = ?, completed_at = NULL
+        WHERE repository_url = ? AND status = 'failed'
+      `).run(now, repositoryUrl)
+      shouldLaunch = retry.changes === 1
+    }
     const audit = this.getByRepositoryUrl(repositoryUrl)
     if (!audit) throw new Error('Audit insert failed')
-    return { audit, created: result.changes === 1 }
+    return { audit, created: shouldLaunch }
   }
 
   get(id: string): AuditRecord | null {

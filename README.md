@@ -1,11 +1,11 @@
 # RepoSentry
 
-RepoSentry is a compact full-stack GitHub library security auditor. Submit a public repository URL and the Node API creates a Conductor cloud workspace running Codex (`gpt-5.6-sol`), sends a static-analysis-only security brief, monitors the session, and stores the complete transcript in SQLite. The React UI polls the local API and renders the final report as safe Markdown.
+RepoSentry is a compact full-stack GitHub library security auditor. Submit a public repository URL and the Node API creates a Conductor cloud workspace running Codex (`gpt-5.6-sol`) from a configured host repository, sends a static-analysis-only security brief containing the target URL, monitors the session, and stores the complete transcript in SQLite. The React UI polls the local API and renders the final report as safe Markdown.
 
 ## Architecture
 
 - **Frontend:** React, Vite, TypeScript, Tailwind CSS, Valtio state in `src/state.ts`, and `react-markdown` with raw HTML disabled.
-- **Backend:** Hono on Node, with a small Conductor HTTP client and durable polling monitor.
+- **Backend:** Hono on Node, with a small Conductor HTTP client and durable polling monitor. The workspace starts from an allowlisted host repository; Codex retrieves the public audit target separately for static inspection.
 - **Persistence:** Node's built-in SQLite driver. Schema initialization runs on startup; normalized repository URLs have a unique constraint.
 - **Recovery:** queued/running rows are resumed on server startup. A database lease prevents duplicate monitors from launching the same row under normal concurrent operation.
 
@@ -35,6 +35,8 @@ Conductor cloud workspaces already provide `CONDUCTOR_API_URL` and typically a s
 | `CONDUCTOR_API_KEY` | Yes* | — | Server-only bearer credential |
 | `CONDUCTOR_API_TOKEN` | Yes* | — | Fallback cloud workspace token |
 | `CONDUCTOR_SESSION_ID` | No | — | Request attribution header |
+| `CONDUCTOR_WORKSPACE_PROJECT_ID` | Yes* | — | Preferred Conductor project used to host audit workspaces |
+| `CONDUCTOR_WORKSPACE_REPOSITORY_URL` | Yes* | — | Host repository URL fallback; it must be in the active Cloud Computer build |
 | `DATABASE_PATH` | No | `./data/audits.db` | SQLite file |
 | `PORT` | No | `8787` | Production/API port |
 | `AUDIT_POLL_INTERVAL_MS` | No | `5000` | Conductor polling interval |
@@ -44,7 +46,7 @@ Conductor cloud workspaces already provide `CONDUCTOR_API_URL` and typically a s
 | `AUDIT_MAX_POLL_ERRORS` | No | `8` | Failed polling cycles before failure |
 | `AUDIT_MAX_DURATION_MS` | No | `7200000` | Maximum wall time for an audit |
 
-\* `CONDUCTOR_API_KEY` takes precedence; one credential is required.
+\* `CONDUCTOR_API_KEY` takes precedence over the token; one credential is required. Configure either the host project ID or host repository URL, with project ID taking precedence.
 
 ## Commands
 
@@ -60,14 +62,14 @@ npm start          # serve production build
 
 `POST /api/audits` accepts `{ "repositoryUrl": "https://github.com/owner/repo" }`. The server rejects non-HTTPS URLs, credentials, query strings, fragments, non-GitHub hosts, and paths other than exactly `owner/repo`; trailing `/` and `.git` are normalized away.
 
-SQLite uniqueness makes submission idempotent, including URL case differences. An existing completed row is returned with `cached: true` and no workspace launch. An existing queued/running row is returned as-is. A new row is returned as `202`, launched in the background, and can be polled at `GET /api/audits/:id` until `completed` or `failed`.
+SQLite uniqueness makes submission idempotent, including URL case differences. An existing completed row is returned with `cached: true` and no workspace launch. An existing queued/running row is returned as-is. Failed rows are cleared and retried on the next submission. A new or retried row is returned as `202`, launched in the background, and can be polled at `GET /api/audits/:id` until `completed` or `failed`.
 
 The monitor reads messages incrementally, waits until it observes `working` before treating a later `idle` as complete (with the documented fast-response transcript fallback), and fetches the final paginated transcript before completion.
 
 ## Security and limitations
 
 - Repository URLs and transcripts are untrusted. URLs are never passed to a shell. Markdown raw HTML and remote images are disabled, links use safe renderer defaults plus `noopener`, and the app sends restrictive security headers.
-- The audit prompt explicitly forbids installs, builds, lifecycle scripts, tests, binaries, and downloaded payload execution. This is an instruction to an automated agent, not a sandbox policy proof.
+- The audit prompt tells Codex to obtain the target through a shallow clone with hooks/submodules disabled or GitHub HTTPS endpoints, and explicitly forbids installs, builds, lifecycle scripts, tests, binaries, and downloaded payload execution. This is an instruction to an automated agent, not a sandbox policy proof.
 - Results can contain false positives and false negatives and are not a guarantee of safety or a replacement for expert review, dynamic analysis, dependency intelligence, or secret rotation.
 - A durable lease handles restarts and ordinary concurrency. Because workspace creation currently has no public idempotency key, a process crash after Conductor accepts creation but before SQLite records its response can theoretically orphan a workspace.
 - Completed audits are intentionally immutable by normalized URL. Delete the local database row manually if a fresh audit of a changed repository is required.
