@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", sans-serif;
+  --font-mono: "DM Mono", monospace;
+  --font-display: "Manrope", sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: #07100e; }
+.grid-noise {
+  background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
+}
+.scan-progress { animation: scan 1.8s ease-in-out infinite alternate; }
+@keyframes scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+
+.markdown { color: #d6d3d1; font-size: .925rem; line-height: 1.8; overflow-wrap: anywhere; }
+.markdown h1, .markdown h2, .markdown h3 { color: #f5f5f4; font-family: "Manrope", sans-serif; letter-spacing: -.025em; line-height: 1.25; }
+.markdown h1 { font-size: 2rem; margin: 0 0 1.5rem; }
+.markdown h2 { font-size: 1.35rem; margin: 2.5rem 0 .9rem; padding-bottom: .6rem; border-bottom: 1px solid rgba(255,255,255,.1); }
+.markdown h3 { font-size: 1.05rem; margin: 1.75rem 0 .6rem; color: #a7f3d0; }
+.markdown p, .markdown ul, .markdown ol { margin: .8rem 0; }
+.markdown ul, .markdown ol { padding-left: 1.4rem; }
+.markdown ul { list-style: disc; }
+.markdown ol { list-style: decimal; }
+.markdown li { margin: .3rem 0; }
+.markdown strong { color: #fafaf9; font-weight: 600; }
+.markdown a { color: #6ee7b7; text-decoration: underline; text-underline-offset: 3px; }
+.markdown code { border: 1px solid rgba(255,255,255,.1); border-radius: .3rem; background: rgba(255,255,255,.05); padding: .12rem .35rem; color: #a7f3d0; font-family: "DM Mono", monospace; font-size: .82em; }
+.markdown pre { overflow-x: auto; border: 1px solid rgba(255,255,255,.1); border-radius: .75rem; background: #060c0a; padding: 1rem; }
+.markdown pre code { border: 0; background: transparent; padding: 0; }
+.markdown blockquote { margin: 1rem 0; border-left: 3px solid #6ee7b7; padding-left: 1rem; color: #a8a29e; }
+.markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.markdown th, .markdown td { border: 1px solid rgba(255,255,255,.12); padding: .55rem .75rem; text-align: left; }
+.markdown th { color: #f5f5f4; background: rgba(255,255,255,.04); }
+.markdown hr { border: 0; border-top: 1px solid rgba(255,255,255,.1); margin: 2.5rem 0; }
+@media (prefers-reduced-motion: reduce) { .scan-progress, .animate-pulse { animation: none !important; } }
